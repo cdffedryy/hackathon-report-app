@@ -16,7 +16,22 @@ description: end-to-end workflow for turning a requirements doc into a merged PR
 
 2. **Phase 1 — Planning (Planner role)**
    1. Run Spec Kit (`spec-kit init` / `spec-kit update`) to generate a new spec file under `spec/` (e.g., `spec/<slug>-<date>.md`). Capture requirements, assumptions, risks, and explicit tasks.
-   2. Share the spec summary in chat and commit the spec before implementation begins.
+   2. Immediately create/update a local workflow checklist that mirrors the spec deliverables:
+      - Store it under `checklist/<spec-file-name>.md` so it matches the spec filename (e.g., `spec/manual-report-edit-20260408.md` ↔ `checklist/manual-report-edit-20260408.md`). The `checklist/` directory is gitignored on purpose so you can freely mark progress.
+      - Use Markdown checkboxes for the canonical pipeline tasks Cascade must finish: generate the spec via Spec Kit, implement the code, write/update tests, push branch & create/update the PR, run `/review` (or `gh-pr-review`) and leave inline comments, resolve all PR comments, and deliver the final hand-off summary.
+      - Recommended template:
+        ```markdown
+        - [ ] Spec generated via Spec Kit
+        - [ ] Code implemented per spec
+        - [ ] Tests updated/passing locally
+        - [ ] Feature branch pushed & PR updated
+        - [ ] /review workflow run with inline comments
+        - [ ] Review comments resolved & tests rerun
+        - [ ] Final hand-off summary posted
+        ```
+   3. Keep the checklist updated throughout the workflow (mark items `[x]` once complete). Do not end the workflow until every required checkbox is marked. Checklist files must stay local (never `git add`/commit them)—if you run `git add .`, follow up with `git reset checklist/` before committing.
+   4. Mirror the finalized requirements into `docs/maker-checker-spec.md` so the canonical system spec stays current (summaries, API updates, risks, etc.). Mention in chat which sections changed.
+   5. Share the spec summary in chat and commit the spec before implementation begins.
 
 3. **Phase 2 — Implementation & Local Validation (Executor/Tester roles)**
    1. Checkout a feature branch derived from the spec summary:

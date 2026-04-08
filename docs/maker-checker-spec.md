@@ -72,7 +72,7 @@
 
 ## 7. 前端交互要点
 1. **状态分区**：同一页面根据角色展示不同 section，Maker 区域包括“选择报表”“当前运行”“历史”“结果表格”；Checker 区域包括“待审批列表”“审批表单”“历史记录”。@frontend/src/app/components/report/report-viewer.component.html#1-281
-2. **Maker 手工调整**：在 `Generated` 状态时展示 JSON 编辑器 + 预览，要求 Maker 保存成功才能提交审批，并在历史/Checker 视图上标记“含手工调整”与备注。@frontend/src/app/components/report/report-viewer.component.html#40-205 @frontend/src/app/components/report/report-viewer.component.ts#72-587
+2. **Maker 手工调整**：`Generated` 状态下提供「网格单元格 + JSON 切换」编辑器，可增删行列、直接修改 cell 值，也可切回原始 JSON；必须保存成功后才能提交，历史/Checker 视图继续标记“含手工调整”与备注。@frontend/src/app/components/report/report-viewer.component.html#40-205 @frontend/src/app/components/report/report-viewer.component.ts#72-700
 3. **错误与 Loading 处理**：每个 API 调用在 `ReportViewerComponent` 里维护独立的 `error/info` 消息，确保 Maker/Checker 互不干扰。@frontend/src/app/components/report/report-viewer.component.ts#31-392
 4. **审计可视化**：表格与 `/runs/:id/flow` 时间线两种呈现，使 Maker/Checker 均可追溯每个事件。@frontend/src/app/components/report/report-viewer.component.html#97-125 @frontend/src/app/components/report/report-run-flow.component.ts#10-127
 5. **安全拦截**：`auth.interceptor` 只对 `http://localhost:8080/api` 前缀附加 Token，避免误加第三方请求。@frontend/src/app/services/auth.interceptor.ts#1-20

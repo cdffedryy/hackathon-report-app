@@ -51,13 +51,13 @@ Makers currently generate report runs and must immediately submit the raw SQL ou
 1. Update schema + entity (`schema.sql`, `ReportRun`) with manual fields and versioning support for optimistic locking during edits.
 2. Extend `ReportRunRepository`/`Service` with `updateManualSnapshot` logic + audit event creation.
 3. Add controller endpoint for manual edits and wire security checks.
-4. Frontend: update `ReportService` interfaces; add maker UI for editing + preview, disable submit until save passes; show manual metadata to checkers.
+4. Frontend: update `ReportService` interfaces; replace maker端的手工 textarea 为「可编辑 grid + JSON 切换」界面（支持增删行列、单元格 inline edit），仍需保存通过后才能提交；在 checker 视图/历史里展示手工标识与备注。
 5. Tests: backend service/controller tests for validation; frontend unit test for editor component (or logic method) plus manual QA doc.
 
 ## Test Plan
 - Backend unit tests for `ReportRunService.saveManualSnapshot` (happy path, invalid status, other maker, invalid JSON, optimistic lock failure).
 - Integration smoke via `ReportRunController` manual edit endpoint (MockMvc controller test covering happy path + validation failure).
-- Frontend: manual QA script verifying JSON binding & error states (automated component test deferred for now, but submission flow must still block when JSON 未保存/无效).
+- Frontend: manual QA script覆盖 grid 编辑、列/行增删、JSON 模式切换和提交阻断逻辑（自动化组件测试暂缓，但提交仍需在 JSON 有效且已保存时才允许）。
 
 ## Open Questions
 - Should we keep the original auto snapshot? (Current plan: not stored separately; rely on audit + Git history. Could add `original_snapshot` later.)

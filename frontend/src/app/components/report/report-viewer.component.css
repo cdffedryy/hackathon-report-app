@@ -53,6 +53,81 @@ th {
   width: 100%;
   margin-top: 8px;
 }
+.manual-edit-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.manual-edit .secondary {
+  background: #f5f5f5;
+  color: #333;
+}
+.manual-grid-wrapper {
+  margin-top: 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 12px;
+  background: #fafafa;
+}
+.manual-grid-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.column-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.manual-grid {
+  width: 100%;
+  border-collapse: collapse;
+}
+.manual-grid th,
+.manual-grid td {
+  border: 1px solid #ccc;
+  padding: 6px;
+  background: #fff;
+}
+.manual-grid input {
+  width: 100%;
+  border: none;
+  outline: none;
+  padding: 4px;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+.manual-grid th {
+  background: #eaf4ff;
+}
+.manual-grid button.icon {
+  margin-left: 6px;
+  background: transparent;
+  color: #c62828;
+  font-weight: bold;
+  padding: 0 6px;
+}
+.manual-grid .mini-col {
+  width: 60px;
+  text-align: center;
+}
+.manual-grid .empty {
+  text-align: center;
+  color: #777;
+  background: #fff;
+}
+.manual-json-editor textarea {
+  min-height: 200px;
+}
+.grid-hint {
+  margin-top: 8px;
+  color: #555;
+  font-size: 13px;
+}
 .manual-actions {
   display: flex;
   align-items: center;

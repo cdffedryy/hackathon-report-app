@@ -73,7 +73,11 @@ export class ReportViewerComponent implements OnInit {
   manualSnapshotText = '';
   manualNote = '';
   manualEditedAt: string | null = null;
-  manualPreviewRows: any[] = [];
+  manualGridRows: Record<string, any>[] = [];
+  manualGridColumns: string[] = [];
+  manualShowRawJson = false;
+  manualNewColumnName = '';
+  manualColumnError: string | null = null;
   manualEditorError: string | null = null;
   manualSaveMessage: string | null = null;
   manualSaveError: string | null = null;
@@ -447,11 +451,6 @@ export class ReportViewerComponent implements OnInit {
     window.URL.revokeObjectURL(url);
   }
 
-  getKeys(data: any[]): string[] {
-    if (!data || data.length === 0) return [];
-    return Object.keys(data[0]);
-  }
-
   viewRunFlow(runId: number) {
     this.router.navigate(['/runs', runId, 'flow']);
   }
@@ -461,9 +460,14 @@ export class ReportViewerComponent implements OnInit {
     if (!value || !value.trim()) {
       this.manualSnapshotValid = false;
       this.manualEditorError = '手工快照不能为空';
-      this.manualPreviewRows = [];
+      this.manualGridRows = [];
+      this.manualGridColumns = [];
     } else {
-      this.manualSnapshotValid = this.tryUpdateManualPreview(value);
+      const parsed = this.syncGridFromJson(value);
+      this.manualSnapshotValid = parsed;
+      if (parsed && !this.manualShowRawJson) {
+        this.rebuildManualSnapshotFromGrid();
+      }
     }
     this.updateManualDirtyFlag();
   }
@@ -500,12 +504,20 @@ export class ReportViewerComponent implements OnInit {
         this.manualNote = run.manualNote || '';
         this.manualNoteBaseline = this.manualNote;
         const formatted = this.prettyPrintJson(run.resultSnapshot || parsed);
-        this.manualSnapshotText = formatted;
-        this.manualSnapshotBaseline = formatted;
-        this.manualSnapshotValid = this.tryUpdateManualPreview(formatted);
+        const synced = this.syncGridFromJson(formatted);
+        if (synced) {
+          this.rebuildManualSnapshotFromGrid();
+          this.manualSnapshotBaseline = this.manualSnapshotText;
+          this.manualSnapshotValid = true;
+        } else {
+          this.manualSnapshotText = formatted;
+          this.manualSnapshotBaseline = formatted;
+          this.manualSnapshotValid = false;
+        }
         this.manualDirty = false;
         this.manualEditorError = null;
         this.manualSaveMessage = '手工调整已保存';
+
         this.loadMakerRuns();
         this.loadCurrentRunAudit();
       },
@@ -521,13 +533,17 @@ export class ReportViewerComponent implements OnInit {
   private initializeManualEditor(run: ReportRun | null) {
     this.manualSaveMessage = null;
     this.manualSaveError = null;
+    this.manualShowRawJson = false;
+    this.manualNewColumnName = '';
+    this.manualColumnError = null;
     if (!run) {
       this.manualSnapshotText = '';
       this.manualSnapshotBaseline = '';
       this.manualNote = '';
       this.manualNoteBaseline = '';
       this.manualEditedAt = null;
-      this.manualPreviewRows = [];
+      this.manualGridRows = [];
+      this.manualGridColumns = [];
       this.manualDirty = false;
       this.manualSnapshotValid = false;
       this.manualEditorError = null;
@@ -540,19 +556,141 @@ export class ReportViewerComponent implements OnInit {
         ? this.prettyPrintJson(this.reportData.data)
         : '';
 
-    this.manualSnapshotText = snapshotSource;
-    this.manualSnapshotBaseline = snapshotSource;
     this.manualNote = run.manualNote || '';
     this.manualNoteBaseline = this.manualNote;
     this.manualEditedAt = run.manualEditedAt || null;
     this.manualDirty = false;
     this.manualEditorError = snapshotSource ? null : '暂无可编辑的快照，请重新执行报表';
-    this.manualSnapshotValid = snapshotSource ? this.tryUpdateManualPreview(snapshotSource) : false;
+    const valid = snapshotSource ? this.syncGridFromJson(snapshotSource) : false;
+    if (valid) {
+      this.rebuildManualSnapshotFromGrid();
+      this.manualSnapshotBaseline = this.manualSnapshotText;
+      this.manualSnapshotValid = true;
+    } else {
+      this.manualSnapshotText = snapshotSource;
+      this.manualSnapshotBaseline = snapshotSource;
+      this.manualSnapshotValid = false;
+    }
   }
 
   private updateManualDirtyFlag() {
     this.manualDirty = this.manualSnapshotText !== this.manualSnapshotBaseline
       || this.manualNote !== this.manualNoteBaseline;
+  }
+
+  private rebuildManualSnapshotFromGrid() {
+    const source = this.manualGridRows.length > 0 ? this.manualGridRows : [];
+    this.manualSnapshotText = this.prettyPrintJson(source);
+    this.manualSnapshotValid = true;
+    this.manualEditorError = null;
+  }
+
+  private syncGridFromJson(text: string): boolean {
+    try {
+      if (!text || !text.trim()) {
+        this.manualGridRows = [];
+        this.manualGridColumns = [];
+        this.manualEditorError = null;
+        return true;
+      }
+      const parsed = JSON.parse(text);
+      let rows: Record<string, any>[] = [];
+      if (Array.isArray(parsed)) {
+        rows = parsed.map(item => this.normalizeGridRow(item));
+      } else if (parsed && typeof parsed === 'object') {
+        rows = [this.normalizeGridRow(parsed)];
+      }
+      const columnSet = new Set<string>();
+      rows.forEach(row => Object.keys(row || {}).forEach(col => columnSet.add(col)));
+      this.manualGridRows = rows;
+      this.manualGridColumns = Array.from(columnSet);
+      this.manualEditorError = null;
+      this.manualColumnError = null;
+      return true;
+    } catch (err) {
+      this.manualGridRows = [];
+      this.manualGridColumns = [];
+      this.manualEditorError = 'JSON 格式错误: ' + (err as Error).message;
+      return false;
+    }
+  }
+
+  updateManualCell(rowIndex: number, columnKey: string, value: string) {
+    if (!this.manualGridRows[rowIndex]) {
+      return;
+    }
+    this.manualGridRows = this.manualGridRows.map((row, idx) => idx === rowIndex ? { ...row, [columnKey]: value } : row);
+    this.persistManualGridChange();
+  }
+
+  addManualRow() {
+    if (this.manualGridColumns.length === 0) {
+      this.manualColumnError = '请先添加至少一列';
+      return;
+    }
+    const newRow: Record<string, any> = {};
+    this.manualGridColumns.forEach(col => newRow[col] = '');
+    this.manualGridRows = [...this.manualGridRows, newRow];
+    this.manualColumnError = null;
+    this.persistManualGridChange();
+  }
+
+  removeManualRow(index: number) {
+    this.manualGridRows = this.manualGridRows.filter((_, i) => i !== index);
+    this.persistManualGridChange();
+  }
+
+  addManualColumn() {
+    const name = (this.manualNewColumnName || '').trim();
+    if (!name) {
+      this.manualColumnError = '列名不能为空';
+      return;
+    }
+    if (this.manualGridColumns.includes(name)) {
+      this.manualColumnError = '列已存在';
+      return;
+    }
+    this.manualGridColumns = [...this.manualGridColumns, name];
+    this.manualGridRows = this.manualGridRows.length > 0
+      ? this.manualGridRows.map(row => ({ ...row, [name]: row[name] ?? '' }))
+      : [{ [name]: '' }];
+    this.manualNewColumnName = '';
+    this.manualColumnError = null;
+    this.persistManualGridChange();
+  }
+
+  removeManualColumn(column: string) {
+    this.manualGridColumns = this.manualGridColumns.filter(col => col !== column);
+    this.manualGridRows = this.manualGridRows.map(row => {
+      const clone = { ...row };
+      delete clone[column];
+      return clone;
+    });
+    this.persistManualGridChange();
+  }
+
+  toggleManualJsonView() {
+    if (this.manualShowRawJson) {
+      this.manualSnapshotValid = this.syncGridFromJson(this.manualSnapshotText);
+      if (this.manualSnapshotValid) {
+        this.rebuildManualSnapshotFromGrid();
+      }
+    } else {
+      this.rebuildManualSnapshotFromGrid();
+    }
+    this.manualShowRawJson = !this.manualShowRawJson;
+  }
+
+  private persistManualGridChange() {
+    this.rebuildManualSnapshotFromGrid();
+    this.updateManualDirtyFlag();
+  }
+
+  private normalizeGridRow(item: any): Record<string, any> {
+    if (item && typeof item === 'object') {
+      return { ...item } as Record<string, any>;
+    }
+    return { value: item };
   }
 
   private prettyPrintJson(raw: any): string {
@@ -563,25 +701,6 @@ export class ReportViewerComponent implements OnInit {
       return JSON.stringify(raw, null, 2);
     } catch {
       return typeof raw === 'string' ? raw : JSON.stringify(raw);
-    }
-  }
-
-  private tryUpdateManualPreview(text: string): boolean {
-    try {
-      const parsed = JSON.parse(text);
-      if (Array.isArray(parsed)) {
-        this.manualPreviewRows = parsed;
-      } else if (parsed && typeof parsed === 'object') {
-        this.manualPreviewRows = [parsed];
-      } else {
-        this.manualPreviewRows = [];
-      }
-      this.manualEditorError = null;
-      return true;
-    } catch (err) {
-      this.manualPreviewRows = [];
-      this.manualEditorError = 'JSON 格式错误: ' + (err as Error).message;
-      return false;
     }
   }
 }

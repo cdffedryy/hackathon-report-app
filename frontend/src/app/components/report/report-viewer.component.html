@@ -63,13 +63,60 @@
     <div *ngIf="submitError" class="error">{{ submitError }}</div>
 
     <div class="manual-edit">
-      <h3>手工调整</h3>
-      <textarea rows="10" [ngModel]="manualSnapshotText" (ngModelChange)="onManualSnapshotInput($event)"></textarea>
+      <div class="manual-edit-header">
+        <h3>手工调整</h3>
+        <button type="button" class="secondary" (click)="toggleManualJsonView()">
+          {{ manualShowRawJson ? '切换到表格模式' : '切换到 JSON 模式' }}
+        </button>
+      </div>
+
+      <div *ngIf="manualShowRawJson" class="manual-json-editor">
+        <textarea rows="12" [ngModel]="manualSnapshotText" (ngModelChange)="onManualSnapshotInput($event)"></textarea>
+      </div>
+
+      <div *ngIf="!manualShowRawJson" class="manual-grid-wrapper">
+        <div class="manual-grid-controls">
+          <div class="column-control">
+            <input type="text" placeholder="新列名称" [ngModel]="manualNewColumnName" (ngModelChange)="manualNewColumnName = $event" />
+            <button type="button" (click)="addManualColumn()">添加列</button>
+          </div>
+          <button type="button" (click)="addManualRow()" [disabled]="manualGridColumns.length === 0">添加行</button>
+        </div>
+        <div *ngIf="manualColumnError" class="error">{{ manualColumnError }}</div>
+        <table class="manual-grid" *ngIf="manualGridColumns.length > 0">
+          <thead>
+            <tr>
+              <th *ngFor="let column of manualGridColumns">
+                {{ column }}
+                <button type="button" class="icon" (click)="removeManualColumn(column)" title="删除列">×</button>
+              </th>
+              <th class="mini-col">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let row of manualGridRows; let rowIndex = index">
+              <td *ngFor="let column of manualGridColumns">
+                <input type="text" [ngModel]="row[column]" (ngModelChange)="updateManualCell(rowIndex, column, $event)" />
+              </td>
+              <td class="mini-col">
+                <button type="button" class="icon" (click)="removeManualRow(rowIndex)" title="删除行">×</button>
+              </td>
+            </tr>
+            <tr *ngIf="manualGridRows.length === 0">
+              <td [attr.colspan]="manualGridColumns.length + 1" class="empty">暂无数据，先添加行</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="grid-hint" *ngIf="manualGridColumns.length === 0">先添加列，再开始在单元格里编辑数值，可随时切换回 JSON 视图。</p>
+      </div>
+
       <div *ngIf="manualEditorError" class="error">{{ manualEditorError }}</div>
+
       <label>
         备注（可选）：
         <textarea rows="2" [ngModel]="manualNote" (ngModelChange)="onManualNoteInput($event)"></textarea>
       </label>
+
       <div class="manual-actions">
         <button (click)="saveManualEdits()" [disabled]="!manualDirty || !manualSnapshotValid || manualSaveLoading">保存手工调整</button>
         <span *ngIf="manualSaveLoading">保存中...</span>
@@ -77,21 +124,6 @@
       </div>
       <div *ngIf="manualSaveMessage" class="info">{{ manualSaveMessage }}</div>
       <div *ngIf="manualSaveError" class="error">{{ manualSaveError }}</div>
-      <div class="manual-preview" *ngIf="manualPreviewRows.length > 0">
-        <h4>预览（{{ manualPreviewRows.length }} 条）</h4>
-        <table>
-          <thead>
-            <tr>
-              <th *ngFor="let key of getKeys(manualPreviewRows)">{{ key }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let row of manualPreviewRows">
-              <td *ngFor="let key of getKeys(manualPreviewRows)">{{ row[key] }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
     </div>
 
     <!-- 当前运行的审计轨迹 -->
