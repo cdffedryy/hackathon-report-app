@@ -32,6 +32,49 @@ report:
   templates:
     # Base directory for Excel report templates under classpath resources
     base-path: classpath:report-templates
+  security:
+    allowed-tables:
+      - customer
+      - transaction
+      - merchant
+      - product
+      - orders
+      - order_items
+      - department
+      - employee
+      - report_config
+      - report_run
+      - report_audit_event
+    forbidden-tokens:
+      - ";"
+      - "--"
+      - "/*"
+      - "*/"
+      - INSERT
+      - UPDATE
+      - DELETE
+      - DROP
+      - ALTER
+      - TRUNCATE
+      - MERGE
+      - EXEC
+      - CALL
+      - GRANT
+      - REVOKE
+    max-length: 12000
+  parameters:
+    templates:
+      - report-id: 1
+        filters:
+          - name: status
+            column: t.status
+            operator: EQUALS
+            allowed-values: ["SUCCESS", "PENDING", "PROCESSING"]
+      - report-id: 7
+        filters:
+          - name: month
+            column: t.transaction_date
+            operator: EQUALS
 
 management:
   endpoints:

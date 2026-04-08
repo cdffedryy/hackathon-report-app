@@ -15,6 +15,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api")
@@ -64,15 +65,20 @@ public class ReportController {
     
     // 直接暴露SQL执行接口，这是严重的安全问题
     @PostMapping("/reports/run")
-    public List<Map<String, Object>> runReport(@RequestBody Map<String, String> request) {
-        String sql = request.get("sql");
-        return reportService.runReport(sql);
+    public List<Map<String, Object>> runReport(@RequestBody Map<String, Object> request) {
+        String sql = (String) request.get("sql");
+        if (sql == null || sql.trim().isEmpty()) {
+            throw new RuntimeException("sql 字段必填");
+        }
+        Object rawParams = request.get("params");
+        Map<String, Object> params = convertToParamMap(rawParams);
+        return reportService.runReport(sql, params);
     }
     
     @PostMapping("/reports/generate")
     public Map<String, Object> generateReport(@RequestBody Map<String, Object> request) {
         Long reportId = Long.valueOf(request.get("reportId").toString());
-        String params = (String) request.get("params");
+        Object params = request.get("params");
         return reportService.generateReport(reportId, params);
     }
     
@@ -103,4 +109,18 @@ public class ReportController {
     }
     
     // 没有更新和删除的接口
+
+    private Map<String, Object> convertToParamMap(Object rawParams) {
+        if (rawParams == null) {
+            return Map.of();
+        }
+        if (rawParams instanceof Map<?, ?> map) {
+            return map.entrySet().stream()
+                    .filter(entry -> entry.getKey() != null)
+                    .collect(Collectors.toMap(
+                            entry -> String.valueOf(entry.getKey()),
+                            Map.Entry::getValue));
+        }
+        throw new RuntimeException("params 必须为对象");
+    }
 }

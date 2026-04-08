@@ -1,6 +1,7 @@
 package com.legacy.report.config;
 
 import com.legacy.report.security.JwtAuthenticationFilter;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,6 +17,7 @@ import java.util.Arrays;
 
 @Configuration
 @EnableWebSecurity
+@EnableConfigurationProperties({ReportSecurityProperties.class, ReportParameterTemplateProperties.class})
 public class SecurityConfig {
 
     @Autowired
