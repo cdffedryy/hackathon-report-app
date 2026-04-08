@@ -29,6 +29,9 @@ export interface ReportRun {
   manualNote?: string;
   manualEditedAt?: string;
   hasManualEdits?: boolean;
+  closedAt?: string;
+  closedReason?: string;
+  reopenedAt?: string;
 }
 
 export interface ReportAuditEvent {
@@ -104,6 +107,18 @@ export class ReportService {
     return this.http.post<void>(`${this.apiUrl}/report-runs/${runId}/decision`, {
       decision,
       comment
+    });
+  }
+
+  closeRun(runId: number, reason?: string): Observable<ReportRun> {
+    return this.http.post<ReportRun>(`${this.apiUrl}/report-runs/${runId}/close`, {
+      reason
+    });
+  }
+
+  reopenRun(runId: number, note?: string): Observable<ReportRun> {
+    return this.http.post<ReportRun>(`${this.apiUrl}/report-runs/${runId}/reopen`, {
+      note
     });
   }
 

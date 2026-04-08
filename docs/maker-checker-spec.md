@@ -16,7 +16,7 @@
 | 实体 | 描述 | 关键字段 |
 | --- | --- | --- |
 | `Report` | 报表模板（SQL + 元信息） | `id`, `name`, `sql`, `description` @backend/src/main/java/com/legacy/report/model/Report.java#1-19 |
-| `ReportRun` | 每次执行的业务单据，是审批的原子单位 | 状态机：`Generated → Submitted → Approved/Rejected`；关联 Maker/Checker、时间戳、结果快照。@backend/src/main/java/com/legacy/report/model/ReportRun.java#6-154 |
+| `ReportRun` | 每次执行的业务单据，是审批的原子单位 | 状态机：`Generated ↔ Closed → Submitted → Approved/Rejected`；允许 Maker 在批准前关闭/重开，并关联 Maker/Checker、时间戳、结果快照。@backend/src/main/java/com/legacy/report/model/ReportRun.java#6-154 |
 | `ReportAuditEvent` | 审批轨迹，记录节点、操作者、角色、意见 | 事件类型：`Generated/Submitted/Approved/Rejected/Exported*`，带时间与备注。@backend/src/main/java/com/legacy/report/model/ReportAuditEvent.java#1-40 |
 | `User` | 登录账号，角色以逗号分隔（如 `MAKER,CHECKER`） | `username`, `password`, `role`。@backend/src/main/java/com/legacy/report/model/User.java#9-54 |
 
@@ -39,8 +39,9 @@
 1. **登录**：输入账号密码（默认 `maker1/123456`），获取 JWT 并缓存到 `localStorage`。@frontend/src/app/components/auth/login.component.ts#92-123 @frontend/src/app/services/auth.service.ts#31-65
 2. **选择报表并执行**：下拉选择模板 → 调用 `POST /api/reports/{id}/execute` 执行 SQL，后端会保存 `ReportRun`（状态 `Generated`）并写审计事件。@frontend/src/app/components/report/report-viewer.component.html#27-87 @backend/src/main/java/com/legacy/report/controller/ReportController.java#84-89 @backend/src/main/java/com/legacy/report/service/ReportRunService.java#75-128
 3. **查看运行状态与结果**：前端轮询「我的最新运行」和审计轨迹，展示快照与下载入口。@frontend/src/app/components/report/report-viewer.component.ts#158-208
-4. **提交审批**：只有 run 状态为 `Generated` 且由本人生成才能提交；提交后状态转 `Submitted` 并记录时间。@backend/src/main/java/com/legacy/report/service/ReportRunService.java#130-168
-5. **历史追踪**：Maker 可在“我的提交历史”中查看所有 run、导出 Excel、或跳转审批流程视图。@frontend/src/app/components/report/report-viewer.component.html#89-126 @frontend/src/app/components/report/report-viewer.component.ts#137-208
+4. **提交 / 关闭**：只有 run 状态为 `Generated` 且由本人生成才能提交；提交后状态转 `Submitted` 并记录时间。若 Maker 发现问题，可在 `Generated` 或 `Submitted`（未审批）状态下执行“关闭”操作，run 进入 `Closed` 并从 Checker 待办移除，同时可选择填写关闭原因。@backend/src/main/java/com/legacy/report/service/ReportRunService.java#130-168
+5. **重新编辑**：处于 `Closed` 状态的 run 可由原 Maker 重新打开（状态回到 `Generated`），沿用现有手工快照继续编辑并再次提交。每次关闭/重开都会写入审计轨迹。@frontend/src/app/components/report/report-viewer.component.ts#137-245
+6. **历史追踪**：Maker 可在“我的提交历史”中查看所有 run、导出 Excel、或跳转审批流程视图，列表将展示 `Closed` 状态及关闭/重开时间与原因。@frontend/src/app/components/report/report-viewer.component.html#89-126 @frontend/src/app/components/report/report-viewer.component.ts#137-208
 
 ### 5.2 Checker 审批流程
 1. **登录 / 导航**：Checker 登录后默认落在 `/checker` 视图，加载待审批列表。@frontend/src/app/components/auth/login.component.ts#111-123 @frontend/src/app/components/report/report-viewer.component.ts#211-233
@@ -62,6 +63,8 @@
 | `/api/reports/{id}/export` | GET | Maker | 导出最新 run 的 Excel。@backend/src/main/java/com/legacy/report/controller/ReportController.java#91-103 |
 | `/api/report-runs/{id}/submit` | POST | Maker | 将 `Generated` run 提交至审批。@backend/src/main/java/com/legacy/report/controller/ReportRunController.java#28-31 |
 | `/api/report-runs/{id}/manual-snapshot` | PUT | Maker | 保存 Maker 手工编辑后的 JSON 快照与备注，仅允许 `Generated` 且本人运行。@backend/src/main/java/com/legacy/report/controller/ReportRunController.java#33-116 |
+| `/api/report-runs/{id}/close` | POST | Maker | 撤回/关闭指定 run（只允许 `Generated` 或未审批的 `Submitted`），记录原因并写审计，Checker 待办不再显示。 |
+| `/api/report-runs/{id}/reopen` | POST | Maker | 重新打开 `Closed` 的 run，恢复 `Generated` 状态供继续编辑/提交，写审计。 |
 | `/api/report-runs/{id}/decision` | POST | Checker | 执行批准/拒绝，拒绝需 comment。@backend/src/main/java/com/legacy/report/controller/ReportRunController.java#33-52 |
 | `/api/report-runs/my-latest?reportId=` | GET | Maker | 取某报表最近 run（用于刷新状态）。@backend/src/main/java/com/legacy/report/controller/ReportRunController.java#54-57 |
 | `/api/report-runs/my-runs` | GET | Maker | Maker 历史列表。@backend/src/main/java/com/legacy/report/controller/ReportRunController.java#59-62 |
@@ -72,7 +75,7 @@
 
 ## 7. 前端交互要点
 1. **状态分区**：同一页面根据角色展示不同 section，Maker 区域包括“选择报表”“当前运行”“历史”“结果表格”；Checker 区域包括“待审批列表”“审批表单”“历史记录”。@frontend/src/app/components/report/report-viewer.component.html#1-281
-2. **Maker 手工调整**：`Generated` 状态下提供「网格单元格 + JSON 切换」编辑器，可增删行列、直接修改 cell 值，也可切回原始 JSON；必须保存成功后才能提交，历史/Checker 视图继续标记“含手工调整”与备注。@frontend/src/app/components/report/report-viewer.component.html#40-205 @frontend/src/app/components/report/report-viewer.component.ts#72-700
+2. **Maker 手工调整与关闭/重开**：`Generated` 状态下提供「网格单元格 + JSON 切换」编辑器，可增删行列、直接修改 cell 值，也可切回原始 JSON；必须保存成功后才能提交。额外提供“关闭/撤回”按钮（对 `Generated`/`Submitted`），采集原因并立即将状态标记为 `Closed`；若状态为 `Closed` 则改为“重新编辑”按钮，将 run 回退到 `Generated` 并恢复编辑界面。历史/Checker 视图继续标记“含手工调整”“关闭原因”等信息。@frontend/src/app/components/report/report-viewer.component.html#40-205 @frontend/src/app/components/report/report-viewer.component.ts#72-700
 3. **错误与 Loading 处理**：每个 API 调用在 `ReportViewerComponent` 里维护独立的 `error/info` 消息，确保 Maker/Checker 互不干扰。@frontend/src/app/components/report/report-viewer.component.ts#31-392
 4. **审计可视化**：表格与 `/runs/:id/flow` 时间线两种呈现，使 Maker/Checker 均可追溯每个事件。@frontend/src/app/components/report/report-viewer.component.html#97-125 @frontend/src/app/components/report/report-run-flow.component.ts#10-127
 5. **安全拦截**：`auth.interceptor` 只对 `http://localhost:8080/api` 前缀附加 Token，避免误加第三方请求。@frontend/src/app/services/auth.interceptor.ts#1-20

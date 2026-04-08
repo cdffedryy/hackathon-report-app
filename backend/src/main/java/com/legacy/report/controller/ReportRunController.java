@@ -31,6 +31,18 @@ public class ReportRunController {
         reportRunService.submitRun(id);
     }
 
+    @PostMapping("/{id}/close")
+    public ReportRun close(@PathVariable Long id, @RequestBody(required = false) CloseRequest request) {
+        String reason = request != null ? request.getReason() : null;
+        return reportRunService.closeRun(id, reason);
+    }
+
+    @PostMapping("/{id}/reopen")
+    public ReportRun reopen(@PathVariable Long id, @RequestBody(required = false) ReopenRequest request) {
+        String note = request != null ? request.getNote() : null;
+        return reportRunService.reopenRun(id, note);
+    }
+
     @PutMapping("/{id}/manual-snapshot")
     public ReportRun updateManualSnapshot(@PathVariable Long id, @RequestBody ManualSnapshotRequest request) {
         if (request == null || request.getSnapshot() == null) {
@@ -107,6 +119,30 @@ public class ReportRunController {
         public void setSnapshot(Object snapshot) {
             this.snapshot = snapshot;
         }
+
+        public String getNote() {
+            return note;
+        }
+
+        public void setNote(String note) {
+            this.note = note;
+        }
+    }
+
+    public static class CloseRequest {
+        private String reason;
+
+        public String getReason() {
+            return reason;
+        }
+
+        public void setReason(String reason) {
+            this.reason = reason;
+        }
+    }
+
+    public static class ReopenRequest {
+        private String note;
 
         public String getNote() {
             return note;

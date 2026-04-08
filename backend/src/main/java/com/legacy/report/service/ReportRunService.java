@@ -32,6 +32,7 @@ public class ReportRunService {
 
     private static final Logger logger = LoggerFactory.getLogger(ReportRunService.class);
     private static final int MANUAL_NOTE_MAX_LENGTH = 1000;
+    private static final int CLOSE_REASON_MAX_LENGTH = 500;
 
     @Autowired
     private ReportService reportService;
@@ -171,6 +172,100 @@ public class ReportRunService {
         }
 
         logger.info("event=report_run_submit_success runId={} reportId={} maker={}",
+                saved.getId(), saved.getReportId(), currentUser.getUsername());
+
+        return saved;
+    }
+
+    @Transactional
+    public ReportRun closeRun(Long runId, String reason) {
+        User currentUser = currentUserService.getCurrentUserOrThrow();
+        currentUserService.requireRole(currentUser, "MAKER");
+
+        ReportRun run = reportRunRepository.findById(runId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "报表运行实例不存在"));
+
+        ensureRunOwnedByCurrentMaker(run, currentUser);
+
+        if ("Approved".equals(run.getStatus()) || "Rejected".equals(run.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "已完成的报表运行无法关闭");
+        }
+        if ("Closed".equals(run.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "该报表运行已处于关闭状态");
+        }
+        if (!"Generated".equals(run.getStatus()) && !"Submitted".equals(run.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "当前状态不可关闭");
+        }
+
+        String trimmedReason = StringUtils.hasText(reason) ? reason.trim() : null;
+        if (trimmedReason != null && trimmedReason.length() > CLOSE_REASON_MAX_LENGTH) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "关闭原因长度超出限制");
+        }
+
+        run.setStatus("Closed");
+        run.setClosedAt(LocalDateTime.now());
+        run.setClosedReason(trimmedReason);
+        run.setReopenedAt(null);
+        run.setSubmittedAt(null);
+        run.setDecidedAt(null);
+        run.setCheckerUsername(null);
+
+        ReportRun saved = reportRunRepository.save(run);
+
+        auditService.recordEvent(
+                saved.getId(),
+                saved.getReportId(),
+                currentUser.getUsername(),
+                currentUser.getRole(),
+                "Closed",
+                trimmedReason
+        );
+
+        logger.info("event=report_run_close_success runId={} reportId={} maker={}",
+                saved.getId(), saved.getReportId(), currentUser.getUsername());
+
+        return saved;
+    }
+
+    @Transactional
+    public ReportRun reopenRun(Long runId, String note) {
+        User currentUser = currentUserService.getCurrentUserOrThrow();
+        currentUserService.requireRole(currentUser, "MAKER");
+
+        ReportRun run = reportRunRepository.findById(runId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "报表运行实例不存在"));
+
+        ensureRunOwnedByCurrentMaker(run, currentUser);
+
+        if (!"Closed".equals(run.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "只有 Closed 状态才能重新编辑");
+        }
+
+        String trimmedNote = StringUtils.hasText(note) ? note.trim() : null;
+        if (trimmedNote != null && trimmedNote.length() > CLOSE_REASON_MAX_LENGTH) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "备注长度超出限制");
+        }
+
+        run.setStatus("Generated");
+        run.setReopenedAt(LocalDateTime.now());
+        run.setClosedAt(null);
+        run.setClosedReason(null);
+        run.setSubmittedAt(null);
+        run.setDecidedAt(null);
+        run.setCheckerUsername(null);
+
+        ReportRun saved = reportRunRepository.save(run);
+
+        auditService.recordEvent(
+                saved.getId(),
+                saved.getReportId(),
+                currentUser.getUsername(),
+                currentUser.getRole(),
+                "Reopened",
+                trimmedNote
+        );
+
+        logger.info("event=report_run_reopen_success runId={} reportId={} maker={}",
                 saved.getId(), saved.getReportId(), currentUser.getUsername());
 
         return saved;
@@ -335,6 +430,12 @@ public class ReportRunService {
             return objectMapper.writeValueAsString(node);
         } catch (JsonProcessingException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "手工快照必须是合法 JSON", e);
+        }
+    }
+
+    private void ensureRunOwnedByCurrentMaker(ReportRun run, User currentUser) {
+        if (!currentUser.getUsername().equals(run.getMakerUsername())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "只能操作由当前 Maker 自己生成的报表运行实例");
         }
     }
 }

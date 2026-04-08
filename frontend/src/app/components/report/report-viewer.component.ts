@@ -87,6 +87,16 @@ export class ReportViewerComponent implements OnInit {
   private manualSnapshotBaseline = '';
   private manualNoteBaseline = '';
 
+  // Maker 关闭/重开状态
+  showClosePanel = false;
+  showReopenPanel = false;
+  closeReason = '';
+  reopenNote = '';
+  closeLoading = false;
+  reopenLoading = false;
+  closeError: string | null = null;
+  reopenError: string | null = null;
+
   // 中文报表名称映射
   private reportNameMap: { [key: string]: string } = {
     'Customer Transaction Analysis': '客户交易分析',
@@ -455,8 +465,105 @@ export class ReportViewerComponent implements OnInit {
     this.router.navigate(['/runs', runId, 'flow']);
   }
 
+  canEditCurrentRun(): boolean {
+    return !!this.currentRun && this.currentRun.status === 'Generated';
+  }
+
+  canCloseCurrentRun(): boolean {
+    return !!this.currentRun && (this.currentRun.status === 'Generated' || this.currentRun.status === 'Submitted');
+  }
+
+  canReopenCurrentRun(): boolean {
+    return !!this.currentRun && this.currentRun.status === 'Closed';
+  }
+
+  openClosePanel() {
+    this.showClosePanel = true;
+    this.showReopenPanel = false;
+    this.closeError = null;
+    this.closeReason = '';
+  }
+
+  cancelClosePanel() {
+    this.showClosePanel = false;
+    this.closeReason = '';
+    this.closeError = null;
+  }
+
+  confirmCloseRun() {
+    if (!this.currentRun || !this.canCloseCurrentRun() || this.closeLoading) {
+      return;
+    }
+    this.closeLoading = true;
+    this.closeError = null;
+    this.submitError = null;
+    this.reportService.closeRun(this.currentRun.id, this.closeReason).subscribe({
+      next: (run) => {
+        this.submitMessage = '运行已关闭';
+        this.submitError = null;
+        this.showClosePanel = false;
+        this.closeReason = '';
+        this.handleRunMutation(run);
+      },
+      error: (err) => {
+        this.closeError = '关闭失败: ' + (err.error?.message || err.message || '');
+        this.submitError = this.closeError;
+      },
+      complete: () => {
+        this.closeLoading = false;
+      }
+    });
+  }
+
+  openReopenPanel() {
+    this.showReopenPanel = true;
+    this.showClosePanel = false;
+    this.reopenError = null;
+    this.reopenNote = '';
+  }
+
+  cancelReopenPanel() {
+    this.showReopenPanel = false;
+    this.reopenNote = '';
+    this.reopenError = null;
+  }
+
+  confirmReopenRun() {
+    if (!this.currentRun || !this.canReopenCurrentRun() || this.reopenLoading) {
+      return;
+    }
+    this.reopenLoading = true;
+    this.reopenError = null;
+    this.submitError = null;
+    this.reportService.reopenRun(this.currentRun.id, this.reopenNote).subscribe({
+      next: (run) => {
+        this.submitMessage = '运行已重新开启，可继续编辑';
+        this.submitError = null;
+        this.showReopenPanel = false;
+        this.reopenNote = '';
+        this.handleRunMutation(run);
+      },
+      error: (err) => {
+        this.reopenError = '重新打开失败: ' + (err.error?.message || err.message || '');
+        this.submitError = this.reopenError;
+      },
+      complete: () => {
+        this.reopenLoading = false;
+      }
+    });
+  }
+
+  private handleRunMutation(run: ReportRun) {
+    this.currentRun = run;
+    this.initializeManualEditor(run);
+    this.loadMakerRuns();
+    this.loadCurrentRunAudit();
+    this.loadCheckerRunsIfNeeded();
+  }
+
   onManualSnapshotInput(value: string) {
     this.manualSnapshotText = value;
+
     if (!value || !value.trim()) {
       this.manualSnapshotValid = false;
       this.manualEditorError = '手工快照不能为空';
@@ -485,6 +592,11 @@ export class ReportViewerComponent implements OnInit {
       this.manualSaveError = '手工快照 JSON 无效，无法保存';
       return;
     }
+    if (!this.canEditCurrentRun()) {
+      this.manualSaveError = '当前运行不可编辑，请先重新打开';
+      return;
+    }
+
     let parsed: any;
     try {
       parsed = JSON.parse(this.manualSnapshotText);
@@ -536,6 +648,12 @@ export class ReportViewerComponent implements OnInit {
     this.manualShowRawJson = false;
     this.manualNewColumnName = '';
     this.manualColumnError = null;
+    this.showClosePanel = false;
+    this.showReopenPanel = false;
+    this.closeReason = '';
+    this.reopenNote = '';
+    this.closeError = null;
+    this.reopenError = null;
     if (!run) {
       this.manualSnapshotText = '';
       this.manualSnapshotBaseline = '';

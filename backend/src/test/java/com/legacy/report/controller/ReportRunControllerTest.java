@@ -14,9 +14,11 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -68,5 +70,54 @@ class ReportRunControllerTest {
                 .andExpect(status().isBadRequest());
 
         verify(reportRunService, never()).updateManualSnapshot(any(), any(), any());
+    }
+
+    @Test
+    void updateManualSnapshot_shouldReturnBadRequestWhenSnapshotMissing2() throws Exception {
+        String body = "{" +
+                "\"manualNote\": \"note\"" +
+                "}";
+
+        mockMvc.perform(put("/api/report-runs/{id}/manual-snapshot", 5L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+
+        verify(reportRunService, never()).updateManualSnapshot(any(), any(), any());
+    }
+
+    @Test
+    void closeRun_shouldInvokeServiceWithReason() throws Exception {
+        ReportRun run = new ReportRun();
+        run.setId(7L);
+        run.setStatus("Closed");
+
+        when(reportRunService.closeRun(eq(7L), eq("撤回"))).thenReturn(run);
+
+        mockMvc.perform(post("/api/report-runs/{id}/close", 7L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"撤回\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(7L))
+                .andExpect(jsonPath("$.status").value("Closed"));
+
+        verify(reportRunService).closeRun(eq(7L), eq("撤回"));
+    }
+
+    @Test
+    void reopenRun_shouldInvokeServiceWithoutBody() throws Exception {
+        ReportRun run = new ReportRun();
+        run.setId(9L);
+        run.setStatus("Generated");
+
+        when(reportRunService.reopenRun(eq(9L), isNull())).thenReturn(run);
+
+        mockMvc.perform(post("/api/report-runs/{id}/reopen", 9L)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(9L))
+                .andExpect(jsonPath("$.status").value("Generated"));
+
+        verify(reportRunService).reopenRun(eq(9L), isNull());
     }
 }

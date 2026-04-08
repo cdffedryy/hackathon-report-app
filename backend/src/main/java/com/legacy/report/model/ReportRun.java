@@ -22,7 +22,7 @@ public class ReportRun {
     @Column(name = "report_name", nullable = false)
     private String reportName;
 
-    // 报表运行状态：Generated / Submitted / Approved / Rejected
+    // 报表运行状态：Generated / Submitted / Approved / Rejected / Closed
     @Column(name = "status", nullable = false, length = 32)
     private String status;
 
@@ -65,6 +65,15 @@ public class ReportRun {
 
     @Column(name = "has_manual_edits")
     private Boolean hasManualEdits = Boolean.FALSE;
+
+    @Column(name = "closed_at")
+    private LocalDateTime closedAt;
+
+    @Column(name = "closed_reason", length = 500)
+    private String closedReason;
+
+    @Column(name = "reopened_at")
+    private LocalDateTime reopenedAt;
 
     public Long getId() {
         return id;
@@ -184,5 +193,29 @@ public class ReportRun {
 
     public void setHasManualEdits(Boolean hasManualEdits) {
         this.hasManualEdits = hasManualEdits;
+    }
+
+    public LocalDateTime getClosedAt() {
+        return closedAt;
+    }
+
+    public void setClosedAt(LocalDateTime closedAt) {
+        this.closedAt = closedAt;
+    }
+
+    public String getClosedReason() {
+        return closedReason;
+    }
+
+    public void setClosedReason(String closedReason) {
+        this.closedReason = closedReason;
+    }
+
+    public LocalDateTime getReopenedAt() {
+        return reopenedAt;
+    }
+
+    public void setReopenedAt(LocalDateTime reopenedAt) {
+        this.reopenedAt = reopenedAt;
     }
 }
