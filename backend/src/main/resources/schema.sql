@@ -110,3 +110,8 @@ CREATE TABLE report_config (
     is_deleted INT DEFAULT 0,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Manual edit metadata for report_run table (guarded for existing deployments)
+ALTER TABLE IF EXISTS report_run ADD COLUMN IF NOT EXISTS manual_note TEXT;
+ALTER TABLE IF EXISTS report_run ADD COLUMN IF NOT EXISTS manual_edited_at TIMESTAMP;
+ALTER TABLE IF EXISTS report_run ADD COLUMN IF NOT EXISTS has_manual_edits BOOLEAN DEFAULT FALSE;

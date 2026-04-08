@@ -10,6 +10,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
@@ -28,6 +29,14 @@ public class ReportRunController {
     @PostMapping("/{id}/submit")
     public void submit(@PathVariable Long id) {
         reportRunService.submitRun(id);
+    }
+
+    @PutMapping("/{id}/manual-snapshot")
+    public ReportRun updateManualSnapshot(@PathVariable Long id, @RequestBody ManualSnapshotRequest request) {
+        if (request == null || request.getSnapshot() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "snapshot 字段必填");
+        }
+        return reportRunService.updateManualSnapshot(id, request.getSnapshot(), request.getNote());
     }
 
     @PostMapping("/{id}/decision")
@@ -85,5 +94,26 @@ public class ReportRunController {
         headers.setContentDispositionFormData("attachment", "report-run-" + id + ".xlsx");
 
         return new ResponseEntity<>(body, headers, HttpStatus.OK);
+    }
+
+    public static class ManualSnapshotRequest {
+        private Object snapshot;
+        private String note;
+
+        public Object getSnapshot() {
+            return snapshot;
+        }
+
+        public void setSnapshot(Object snapshot) {
+            this.snapshot = snapshot;
+        }
+
+        public String getNote() {
+            return note;
+        }
+
+        public void setNote(String note) {
+            this.note = note;
+        }
     }
 }

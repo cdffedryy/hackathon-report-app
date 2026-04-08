@@ -94,7 +94,7 @@ git commit -m "<message>"
 
 ### Phase 4: Review Loop (Viewer/Reviewer)
 
-- Viewer uses `gh pr view` + `gh pr diff` (or the gh-pr-review skill) to inspect the PR, leaving explicit inline comments for each issue found.
+- Viewer uses `gh pr view` + `gh pr diff` (or the gh-pr-review skill) to inspect the PR, and every review comment must be an inline GitHub comment referencing the specific file + line(s). Use `gh pr review [<number>|<url>|<branch>] --comment --body "..." --path <relative-path> --line <line> --side right` (or equivalent tooling) so executors can jump directly to the issue.
 - After finishing a review pass, the viewer notifies the executor to resume work based on the comments.
 - Executor addresses feedback, re-runs tests, then squashes the updated commits before pushing to the same remote branch.
 - Viewer repeats the review process until no unresolved comments remain and test coverage is ≥ 70%.

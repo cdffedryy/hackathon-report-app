@@ -44,10 +44,11 @@ description: end-to-end workflow for turning a requirements doc into a merged PR
       - If a PR already exists, skip creation and continue pushing updates.
 
 5. **Phase 4 — Review Loop (Viewer/Reviewer roles)**
-   1. Viewer inspects the PR via `gh pr view`/`gh pr diff` (or the `gh-pr-review` skill) and leaves explicit inline comments for all issues.
-   2. Viewer signals the executor when the review pass is complete.
-   3. Executor implements fixes, reruns tests, squashes commits, and pushes to origin.
-   4. Viewer repeats review until there are zero unresolved comments and coverage remains ≥70%.
+   1. Run the `/review` workflow (or invoke the `gh-pr-review` skill) to produce a formal review with file/line references before declaring the PR ready.
+   2. Viewer inspects the PR via `gh pr view`/`gh pr diff` (or the `gh-pr-review` skill) and leaves explicit inline comments for all issues.
+   3. Viewer signals the executor when the review pass is complete.
+   4. Executor implements fixes, reruns tests, squashes commits, and pushes to origin.
+   5. Viewer repeats review until there are zero unresolved comments and coverage remains ≥70%.
 
 6. **Phase 5 — Quality Gates & Completion Output**
    1. Confirm all automated/manual tests pass.

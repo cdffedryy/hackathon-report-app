@@ -1,6 +1,7 @@
 package com.legacy.report.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.legacy.report.model.Report;
 import com.legacy.report.model.ReportAuditEvent;
@@ -14,8 +15,12 @@ import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -26,6 +31,7 @@ import java.util.Map;
 public class ReportRunService {
 
     private static final Logger logger = LoggerFactory.getLogger(ReportRunService.class);
+    private static final int MANUAL_NOTE_MAX_LENGTH = 1000;
 
     @Autowired
     private ReportService reportService;
@@ -100,6 +106,9 @@ public class ReportRunService {
         try {
             String snapshot = objectMapper.writeValueAsString(data);
             run.setResultSnapshot(snapshot);
+            run.setManualNote(null);
+            run.setManualEditedAt(null);
+            run.setHasManualEdits(Boolean.FALSE);
         } catch (JsonProcessingException e) {
             // 快照失败不影响主流程
             run.setResultSnapshot(null);
@@ -163,6 +172,54 @@ public class ReportRunService {
 
         logger.info("event=report_run_submit_success runId={} reportId={} maker={}",
                 saved.getId(), saved.getReportId(), currentUser.getUsername());
+
+        return saved;
+    }
+
+    @Transactional
+    public ReportRun updateManualSnapshot(Long runId, Object snapshotPayload, String note) {
+        User currentUser = currentUserService.getCurrentUserOrThrow();
+        currentUserService.requireRole(currentUser, "MAKER");
+
+        ReportRun run = reportRunRepository.findById(runId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "报表运行实例不存在"));
+
+        if (!"Generated".equals(run.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "只能编辑 Generated 状态的报表运行实例");
+        }
+        if (!currentUser.getUsername().equals(run.getMakerUsername())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "只能编辑由当前 Maker 自己生成的报表运行实例");
+        }
+        if (snapshotPayload == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "手工快照不能为空");
+        }
+
+        String normalizedSnapshot = normalizeSnapshot(snapshotPayload);
+        String trimmedNote = StringUtils.hasText(note) ? note.trim() : null;
+        if (trimmedNote != null && trimmedNote.length() > MANUAL_NOTE_MAX_LENGTH) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "备注长度超出限制");
+        }
+
+        run.setResultSnapshot(normalizedSnapshot);
+        run.setManualNote(trimmedNote);
+        run.setManualEditedAt(LocalDateTime.now());
+        run.setHasManualEdits(Boolean.TRUE);
+
+        ReportRun saved;
+        try {
+            saved = reportRunRepository.save(run);
+        } catch (ObjectOptimisticLockingFailureException ex) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "手工快照已被其他会话更新，请刷新后重试", ex);
+        }
+
+        auditService.recordEvent(
+                saved.getId(),
+                saved.getReportId(),
+                currentUser.getUsername(),
+                currentUser.getRole(),
+                "ManualEdited",
+                trimmedNote
+        );
 
         return saved;
     }
@@ -263,5 +320,21 @@ public class ReportRunService {
         // 只要是已登录用户即可查看指定 run 的审计轨迹
         currentUserService.getCurrentUserOrThrow();
         return reportAuditEventRepository.findByReportRunIdOrderByEventTimeAsc(reportRunId);
+    }
+
+    private String normalizeSnapshot(Object snapshotPayload) {
+        try {
+            if (snapshotPayload instanceof String strPayload) {
+                if (!StringUtils.hasText(strPayload)) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "手工快照不能为空");
+                }
+                JsonNode node = objectMapper.readTree(strPayload);
+                return objectMapper.writeValueAsString(node);
+            }
+            JsonNode node = objectMapper.valueToTree(snapshotPayload);
+            return objectMapper.writeValueAsString(node);
+        } catch (JsonProcessingException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "手工快照必须是合法 JSON", e);
+        }
     }
 }

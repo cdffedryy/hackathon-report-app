@@ -56,6 +56,16 @@ public class ReportRun {
     @Column(name = "result_snapshot")
     private String resultSnapshot;
 
+    @Lob
+    @Column(name = "manual_note")
+    private String manualNote;
+
+    @Column(name = "manual_edited_at")
+    private LocalDateTime manualEditedAt;
+
+    @Column(name = "has_manual_edits")
+    private Boolean hasManualEdits = Boolean.FALSE;
+
     public Long getId() {
         return id;
     }
@@ -150,5 +160,29 @@ public class ReportRun {
 
     public void setResultSnapshot(String resultSnapshot) {
         this.resultSnapshot = resultSnapshot;
+    }
+
+    public String getManualNote() {
+        return manualNote;
+    }
+
+    public void setManualNote(String manualNote) {
+        this.manualNote = manualNote;
+    }
+
+    public LocalDateTime getManualEditedAt() {
+        return manualEditedAt;
+    }
+
+    public void setManualEditedAt(LocalDateTime manualEditedAt) {
+        this.manualEditedAt = manualEditedAt;
+    }
+
+    public Boolean getHasManualEdits() {
+        return hasManualEdits;
+    }
+
+    public void setHasManualEdits(Boolean hasManualEdits) {
+        this.hasManualEdits = hasManualEdits;
     }
 }

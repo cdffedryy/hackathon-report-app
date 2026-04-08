@@ -47,13 +47,52 @@
     </p>
     <p *ngIf="currentRun.submittedAt">提交时间：{{ currentRun.submittedAt | date:'yyyy-MM-dd HH:mm:ss' }}</p>
     <p *ngIf="currentRun.decidedAt">审批时间：{{ currentRun.decidedAt | date:'yyyy-MM-dd HH:mm:ss' }}</p>
+    <p *ngIf="currentRun.hasManualEdits" class="manual-flag">
+      【包含手工调整】
+      <span *ngIf="currentRun.manualEditedAt">最近编辑：{{ currentRun.manualEditedAt | date:'yyyy-MM-dd HH:mm:ss' }}</span>
+      <span *ngIf="currentRun.manualNote">｜ Maker 备注：{{ currentRun.manualNote }}</span>
+    </p>
 
-    <button *ngIf="currentRun.status === 'Generated'" (click)="submitCurrentRun()">
+    <button *ngIf="currentRun.status === 'Generated'" (click)="submitCurrentRun()" [disabled]="manualDirty || !manualSnapshotValid">
       提交审批
     </button>
+    <span *ngIf="manualDirty" class="warning">请先保存手工调整</span>
+    <span *ngIf="!manualDirty && !manualSnapshotValid" class="warning">JSON 无效，无法提交</span>
     <button (click)="exportCurrentRun()">下载本次运行 Excel</button>
     <div *ngIf="submitMessage" class="info">{{ submitMessage }}</div>
     <div *ngIf="submitError" class="error">{{ submitError }}</div>
+
+    <div class="manual-edit">
+      <h3>手工调整</h3>
+      <textarea rows="10" [ngModel]="manualSnapshotText" (ngModelChange)="onManualSnapshotInput($event)"></textarea>
+      <div *ngIf="manualEditorError" class="error">{{ manualEditorError }}</div>
+      <label>
+        备注（可选）：
+        <textarea rows="2" [ngModel]="manualNote" (ngModelChange)="onManualNoteInput($event)"></textarea>
+      </label>
+      <div class="manual-actions">
+        <button (click)="saveManualEdits()" [disabled]="!manualDirty || !manualSnapshotValid || manualSaveLoading">保存手工调整</button>
+        <span *ngIf="manualSaveLoading">保存中...</span>
+        <span *ngIf="manualDirty" class="warning">有未保存的修改</span>
+      </div>
+      <div *ngIf="manualSaveMessage" class="info">{{ manualSaveMessage }}</div>
+      <div *ngIf="manualSaveError" class="error">{{ manualSaveError }}</div>
+      <div class="manual-preview" *ngIf="manualPreviewRows.length > 0">
+        <h4>预览（{{ manualPreviewRows.length }} 条）</h4>
+        <table>
+          <thead>
+            <tr>
+              <th *ngFor="let key of getKeys(manualPreviewRows)">{{ key }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let row of manualPreviewRows">
+              <td *ngFor="let key of getKeys(manualPreviewRows)">{{ row[key] }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
 
     <!-- 当前运行的审计轨迹 -->
     <div class="audit-section">
@@ -102,6 +141,7 @@
           <th>运行ID</th>
           <th>报表</th>
           <th>状态</th>
+          <th>手工调整</th>
           <th>生成时间</th>
           <th>提交时间</th>
           <th>审批时间</th>
@@ -113,6 +153,7 @@
           <td>#{{ r.id }}</td>
           <td>{{ r.reportName }}</td>
           <td>{{ r.status }}</td>
+          <td>{{ r.hasManualEdits ? '是' : '否' }}</td>
           <td>{{ r.generatedAt | date:'yyyy-MM-dd HH:mm:ss' }}</td>
           <td>{{ r.submittedAt ? (r.submittedAt | date:'yyyy-MM-dd HH:mm:ss') : '-' }}</td>
           <td>{{ r.decidedAt ? (r.decidedAt | date:'yyyy-MM-dd HH:mm:ss') : '-' }}</td>
@@ -123,41 +164,6 @@
         </tr>
       </tbody>
     </table>
-  </div>
-  
-  <div *ngIf="loading">加载中...</div>
-  
-  <div *ngIf="error" class="error">{{ error }}</div>
-  <div *ngIf="exportError" class="error">{{ exportError }}</div>
-  
-  <div *ngIf="selectedReport" class="report-desc">
-    <h3>报表描述</h3>
-    <p>{{ getChineseReportDescription(selectedReport.name) }}</p>
-    <p class="sql-preview">{{ selectedReport.sql }}</p>
-  </div>
-  
-  <!-- Report data display -->
-  <div *ngIf="reportData && reportData.data" class="result">
-    <h3>查询结果 ({{ reportData.count || reportData.data.length }} 条记录)</h3>
-    
-    <table>
-      <thead>
-        <tr>
-          <th *ngFor="let key of getKeys(reportData.data)">{{ key }}</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let row of reportData.data">
-          <td *ngFor="let key of getKeys(reportData.data)">{{ row[key] }}</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-  
-  <!-- If no data but reportData exists -->
-  <div *ngIf="reportData && (!reportData.data || reportData.data.length === 0)" class="result" style="background: #fff3cd; padding: 10px;">
-    <h3>空查询结果</h3>
-    <p>报表已执行但未返回数据</p>
   </div>
 
   <!-- Checker 视角：待审批报表列表和审批操作 -->
@@ -176,7 +182,9 @@
         <h3>待审批列表</h3>
         <select (change)="selectCheckerRun($any($event).target.value)">
           <option *ngFor="let r of checkerRuns" [value]="r.id">
-            #{{ r.id }} ｜ {{ r.reportName }} ｜ Maker: {{ r.makerUsername }} ｜ 提交时间：{{ r.submittedAt | date:'MM-dd HH:mm' }}
+            #{{ r.id }} ｜ {{ r.reportName }} ｜ Maker: {{ r.makerUsername }} ｜
+            <span *ngIf="r.hasManualEdits">含手工调整 ｜</span>
+            提交时间：{{ r.submittedAt | date:'MM-dd HH:mm' }}
           </option>
         </select>
       </div>
@@ -187,6 +195,9 @@
         <p>Maker：{{ selectedCheckerRun.makerUsername }}</p>
         <p>生成时间：{{ selectedCheckerRun.generatedAt | date:'yyyy-MM-dd HH:mm:ss' }}</p>
         <p>提交时间：{{ selectedCheckerRun.submittedAt | date:'yyyy-MM-dd HH:mm:ss' }}</p>
+        <p *ngIf="selectedCheckerRun.hasManualEdits" class="manual-flag">包含手工调整</p>
+        <p *ngIf="selectedCheckerRun.manualNote">Maker 备注：{{ selectedCheckerRun.manualNote }}</p>
+        <p *ngIf="selectedCheckerRun.manualEditedAt">调整时间：{{ selectedCheckerRun.manualEditedAt | date:'yyyy-MM-dd HH:mm:ss' }}</p>
 
         <label>
           决策：

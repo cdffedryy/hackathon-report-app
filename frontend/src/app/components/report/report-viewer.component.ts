@@ -69,6 +69,20 @@ export class ReportViewerComponent implements OnInit {
   checkerHistoryRuns: ReportRun[] = [];
   checkerHistoryError: string | null = null;
 
+  // 手工编辑状态
+  manualSnapshotText = '';
+  manualNote = '';
+  manualEditedAt: string | null = null;
+  manualPreviewRows: any[] = [];
+  manualEditorError: string | null = null;
+  manualSaveMessage: string | null = null;
+  manualSaveError: string | null = null;
+  manualDirty = false;
+  manualSnapshotValid = false;
+  manualSaveLoading = false;
+  private manualSnapshotBaseline = '';
+  private manualNoteBaseline = '';
+
   // 中文报表名称映射
   private reportNameMap: { [key: string]: string } = {
     'Customer Transaction Analysis': '客户交易分析',
@@ -162,6 +176,7 @@ export class ReportViewerComponent implements OnInit {
     this.reportService.getMyLatestRun(this.selectedReport.id).subscribe({
       next: (run) => {
         this.currentRun = run;
+        this.initializeManualEditor(run);
         this.loadCurrentRunAudit();
       },
       error: () => {
@@ -169,6 +184,7 @@ export class ReportViewerComponent implements OnInit {
         this.currentRun = null;
         this.currentRunAudit = [];
         this.currentRunAuditError = null;
+        this.initializeManualEditor(null);
       }
     });
   }
@@ -193,6 +209,14 @@ export class ReportViewerComponent implements OnInit {
 
   submitCurrentRun() {
     if (!this.currentRun || this.currentRun.status !== 'Generated') {
+      return;
+    }
+    if (this.manualDirty) {
+      this.submitError = '存在未保存的手工调整，请先保存后再提交';
+      return;
+    }
+    if (!this.manualSnapshotValid) {
+      this.submitError = '手工快照 JSON 无效，请修正后再提交';
       return;
     }
     this.submitMessage = null;
@@ -309,6 +333,7 @@ export class ReportViewerComponent implements OnInit {
     this.checkerError = null;
     this.checkerAudit = [];
     this.checkerAuditError = null;
+    this.initializeManualEditor(null);
     this.router.navigate(['/login']);
   }
 
@@ -342,6 +367,7 @@ export class ReportViewerComponent implements OnInit {
       this.submitMessage = null;
       this.submitError = null;
       this.currentRun = null;
+      this.initializeManualEditor(null);
     }
   }
 
@@ -359,6 +385,7 @@ export class ReportViewerComponent implements OnInit {
       },
       error: (err) => {
         this.error = 'Failed to execute report: ' + err.message;
+        this.loading = false;
       }
     });
   }
@@ -427,5 +454,134 @@ export class ReportViewerComponent implements OnInit {
 
   viewRunFlow(runId: number) {
     this.router.navigate(['/runs', runId, 'flow']);
+  }
+
+  onManualSnapshotInput(value: string) {
+    this.manualSnapshotText = value;
+    if (!value || !value.trim()) {
+      this.manualSnapshotValid = false;
+      this.manualEditorError = '手工快照不能为空';
+      this.manualPreviewRows = [];
+    } else {
+      this.manualSnapshotValid = this.tryUpdateManualPreview(value);
+    }
+    this.updateManualDirtyFlag();
+  }
+
+  onManualNoteInput(value: string) {
+    this.manualNote = value;
+    this.updateManualDirtyFlag();
+  }
+
+  saveManualEdits() {
+    if (!this.currentRun || this.manualSaveLoading) {
+      return;
+    }
+    if (!this.manualSnapshotValid) {
+      this.manualSaveError = '手工快照 JSON 无效，无法保存';
+      return;
+    }
+    let parsed: any;
+    try {
+      parsed = JSON.parse(this.manualSnapshotText);
+    } catch (err) {
+      this.manualSnapshotValid = false;
+      this.manualEditorError = 'JSON 格式错误: ' + (err as Error).message;
+      return;
+    }
+
+    this.manualSaveMessage = null;
+    this.manualSaveError = null;
+    this.manualSaveLoading = true;
+    this.reportService.saveManualSnapshot(this.currentRun.id, parsed, this.manualNote).subscribe({
+      next: (run) => {
+        this.currentRun = run;
+        this.manualEditedAt = run.manualEditedAt || null;
+        this.manualNote = run.manualNote || '';
+        this.manualNoteBaseline = this.manualNote;
+        const formatted = this.prettyPrintJson(run.resultSnapshot || parsed);
+        this.manualSnapshotText = formatted;
+        this.manualSnapshotBaseline = formatted;
+        this.manualSnapshotValid = this.tryUpdateManualPreview(formatted);
+        this.manualDirty = false;
+        this.manualEditorError = null;
+        this.manualSaveMessage = '手工调整已保存';
+        this.loadMakerRuns();
+        this.loadCurrentRunAudit();
+      },
+      error: (err) => {
+        this.manualSaveError = '保存失败: ' + (err.error?.message || err.message || '');
+      },
+      complete: () => {
+        this.manualSaveLoading = false;
+      }
+    });
+  }
+
+  private initializeManualEditor(run: ReportRun | null) {
+    this.manualSaveMessage = null;
+    this.manualSaveError = null;
+    if (!run) {
+      this.manualSnapshotText = '';
+      this.manualSnapshotBaseline = '';
+      this.manualNote = '';
+      this.manualNoteBaseline = '';
+      this.manualEditedAt = null;
+      this.manualPreviewRows = [];
+      this.manualDirty = false;
+      this.manualSnapshotValid = false;
+      this.manualEditorError = null;
+      return;
+    }
+
+    const snapshotSource = run.resultSnapshot
+      ? this.prettyPrintJson(run.resultSnapshot)
+      : this.reportData?.data
+        ? this.prettyPrintJson(this.reportData.data)
+        : '';
+
+    this.manualSnapshotText = snapshotSource;
+    this.manualSnapshotBaseline = snapshotSource;
+    this.manualNote = run.manualNote || '';
+    this.manualNoteBaseline = this.manualNote;
+    this.manualEditedAt = run.manualEditedAt || null;
+    this.manualDirty = false;
+    this.manualEditorError = snapshotSource ? null : '暂无可编辑的快照，请重新执行报表';
+    this.manualSnapshotValid = snapshotSource ? this.tryUpdateManualPreview(snapshotSource) : false;
+  }
+
+  private updateManualDirtyFlag() {
+    this.manualDirty = this.manualSnapshotText !== this.manualSnapshotBaseline
+      || this.manualNote !== this.manualNoteBaseline;
+  }
+
+  private prettyPrintJson(raw: any): string {
+    try {
+      if (typeof raw === 'string') {
+        return JSON.stringify(JSON.parse(raw), null, 2);
+      }
+      return JSON.stringify(raw, null, 2);
+    } catch {
+      return typeof raw === 'string' ? raw : JSON.stringify(raw);
+    }
+  }
+
+  private tryUpdateManualPreview(text: string): boolean {
+    try {
+      const parsed = JSON.parse(text);
+      if (Array.isArray(parsed)) {
+        this.manualPreviewRows = parsed;
+      } else if (parsed && typeof parsed === 'object') {
+        this.manualPreviewRows = [parsed];
+      } else {
+        this.manualPreviewRows = [];
+      }
+      this.manualEditorError = null;
+      return true;
+    } catch (err) {
+      this.manualPreviewRows = [];
+      this.manualEditorError = 'JSON 格式错误: ' + (err as Error).message;
+      return false;
+    }
   }
 }

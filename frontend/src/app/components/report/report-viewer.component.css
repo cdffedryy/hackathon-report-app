@@ -48,3 +48,25 @@ th {
   white-space: pre-wrap;
   font-size: 12px;
 }
+.manual-edit textarea {
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  width: 100%;
+  margin-top: 8px;
+}
+.manual-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+.manual-preview {
+  margin-top: 12px;
+}
+.manual-flag {
+  color: #b45f06;
+  font-weight: 600;
+}
+.warning {
+  color: #b45f06;
+  margin-left: 10px;
+}

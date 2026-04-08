@@ -61,6 +61,7 @@
 | `/api/reports/{id}/execute` | POST | Maker | 执行报表 + 生成 run（返回结果集）。@backend/src/main/java/com/legacy/report/controller/ReportController.java#84-89 |
 | `/api/reports/{id}/export` | GET | Maker | 导出最新 run 的 Excel。@backend/src/main/java/com/legacy/report/controller/ReportController.java#91-103 |
 | `/api/report-runs/{id}/submit` | POST | Maker | 将 `Generated` run 提交至审批。@backend/src/main/java/com/legacy/report/controller/ReportRunController.java#28-31 |
+| `/api/report-runs/{id}/manual-snapshot` | PUT | Maker | 保存 Maker 手工编辑后的 JSON 快照与备注，仅允许 `Generated` 且本人运行。@backend/src/main/java/com/legacy/report/controller/ReportRunController.java#33-116 |
 | `/api/report-runs/{id}/decision` | POST | Checker | 执行批准/拒绝，拒绝需 comment。@backend/src/main/java/com/legacy/report/controller/ReportRunController.java#33-52 |
 | `/api/report-runs/my-latest?reportId=` | GET | Maker | 取某报表最近 run（用于刷新状态）。@backend/src/main/java/com/legacy/report/controller/ReportRunController.java#54-57 |
 | `/api/report-runs/my-runs` | GET | Maker | Maker 历史列表。@backend/src/main/java/com/legacy/report/controller/ReportRunController.java#59-62 |
@@ -71,9 +72,10 @@
 
 ## 7. 前端交互要点
 1. **状态分区**：同一页面根据角色展示不同 section，Maker 区域包括“选择报表”“当前运行”“历史”“结果表格”；Checker 区域包括“待审批列表”“审批表单”“历史记录”。@frontend/src/app/components/report/report-viewer.component.html#1-281
-2. **错误与 Loading 处理**：每个 API 调用在 `ReportViewerComponent` 里维护独立的 `error/info` 消息，确保 Maker/Checker 互不干扰。@frontend/src/app/components/report/report-viewer.component.ts#31-310
-3. **审计可视化**：表格与 `/runs/:id/flow` 时间线两种呈现，使 Maker/Checker 均可追溯每个事件。@frontend/src/app/components/report/report-viewer.component.html#58-86 @frontend/src/app/components/report/report-run-flow.component.ts#10-127
-4. **安全拦截**：`auth.interceptor` 只对 `http://localhost:8080/api` 前缀附加 Token，避免误加第三方请求。@frontend/src/app/services/auth.interceptor.ts#1-20
+2. **Maker 手工调整**：在 `Generated` 状态时展示 JSON 编辑器 + 预览，要求 Maker 保存成功才能提交审批，并在历史/Checker 视图上标记“含手工调整”与备注。@frontend/src/app/components/report/report-viewer.component.html#40-205 @frontend/src/app/components/report/report-viewer.component.ts#72-587
+3. **错误与 Loading 处理**：每个 API 调用在 `ReportViewerComponent` 里维护独立的 `error/info` 消息，确保 Maker/Checker 互不干扰。@frontend/src/app/components/report/report-viewer.component.ts#31-392
+4. **审计可视化**：表格与 `/runs/:id/flow` 时间线两种呈现，使 Maker/Checker 均可追溯每个事件。@frontend/src/app/components/report/report-viewer.component.html#97-125 @frontend/src/app/components/report/report-run-flow.component.ts#10-127
+5. **安全拦截**：`auth.interceptor` 只对 `http://localhost:8080/api` 前缀附加 Token，避免误加第三方请求。@frontend/src/app/services/auth.interceptor.ts#1-20
 
 ## 8. 已知风险与改进方向
 1. **SQL 注入与越权**：`ReportService.runReport` 与 `generateReport` 将用户参数直接拼接 SQL，应改为参数化查询并增加白名单。@backend/src/main/java/com/legacy/report/service/ReportService.java#26-65
