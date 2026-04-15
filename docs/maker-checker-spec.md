@@ -19,6 +19,7 @@
 | `ReportRun` | 每次执行的业务单据，是审批的原子单位 | 状态机：`Generated → Submitted → Approved/Rejected`；关联 Maker/Checker、时间戳、结果快照。@backend/src/main/java/com/legacy/report/model/ReportRun.java#6-154 |
 | `ReportAuditEvent` | 审批轨迹，记录节点、操作者、角色、意见 | 事件类型：`Generated/Submitted/Approved/Rejected/Exported*`，带时间与备注。@backend/src/main/java/com/legacy/report/model/ReportAuditEvent.java#1-40 |
 | `User` | 登录账号，角色以逗号分隔（如 `MAKER,CHECKER`） | `username`, `password`, `role`。@backend/src/main/java/com/legacy/report/model/User.java#9-54 |
+| `ReportSchedule` | 报表报送计划，定义截止日期和周期性频率 | `id`, `reportId`, `frequency`, `currentDeadline`, `periodStart`, `enabled`。@backend/src/main/java/com/legacy/report/model/ReportSchedule.java |
 
 ## 4. 系统架构概览
 ### 后端
@@ -68,6 +69,9 @@
 | `/api/report-runs/checker/history` | GET | Checker | Checker 历史审批记录。@backend/src/main/java/com/legacy/report/controller/ReportRunController.java#69-72 |
 | `/api/report-runs/{id}/audit` | GET | Maker/Checker | 审计轨迹。@backend/src/main/java/com/legacy/report/controller/ReportRunController.java#74-77 |
 | `/api/report-runs/{id}/export` | GET | Maker/Checker | 基于 run 快照导出（权限在服务层校验）。@backend/src/main/java/com/legacy/report/controller/ReportRunController.java#79-88 |
+| `/api/report-schedules/dashboard` | GET | Maker/Checker/Admin | 获取报送监控看板数据（含报送状态、剩余天数、紧急程度）。@backend/src/main/java/com/legacy/report/controller/ReportScheduleController.java |
+| `/api/report-schedules` | POST | Admin | 创建报表报送计划（截止日期+频率）。@backend/src/main/java/com/legacy/report/controller/ReportScheduleController.java |
+| `/api/report-schedules/{id}` | PUT | Admin | 更新报表报送计划。@backend/src/main/java/com/legacy/report/controller/ReportScheduleController.java |
 
 ## 7. 前端交互要点
 1. **状态分区**：同一页面根据角色展示不同 section，Maker 区域包括“选择报表”“当前运行”“历史”“结果表格”；Checker 区域包括“待审批列表”“审批表单”“历史记录”。@frontend/src/app/components/report/report-viewer.component.html#1-281
@@ -75,15 +79,39 @@
 3. **审计可视化**：表格与 `/runs/:id/flow` 时间线两种呈现，使 Maker/Checker 均可追溯每个事件。@frontend/src/app/components/report/report-viewer.component.html#58-86 @frontend/src/app/components/report/report-run-flow.component.ts#10-127
 4. **安全拦截**：`auth.interceptor` 只对 `http://localhost:8080/api` 前缀附加 Token，避免误加第三方请求。@frontend/src/app/services/auth.interceptor.ts#1-20
 
-## 8. 已知风险与改进方向
+## 8. 报送监控看板
+
+### 8.1 功能概述
+新增"报送监控看板"页面（`/dashboard`），以卡片形式展示所有已配置截止日期的报表及其当前报送状态，对一周内即将到期和已逾期的报表进行颜色高亮提醒。
+
+### 8.2 新增域模型
+- **ReportSchedule**：关联 `report_config`，记录报送频率（ONCE/DAILY/WEEKLY/MONTHLY/QUARTERLY/YEARLY）、当前截止日期、周期开始日期、是否启用。
+
+### 8.3 看板状态规则
+| 条件 | 紧急程度 | 颜色 |
+| --- | --- | --- |
+| 当前周期已 Approved | COMPLETED | 绿色 |
+| 截止日期已过且未 Approved | OVERDUE | 红色 |
+| 截止日期 ≤ 7 天且未 Approved | APPROACHING | 橙色/黄色 |
+| 截止日期 > 7 天 | NORMAL | 默认 |
+
+### 8.4 周期自动滚动
+当报表在截止日期前通过审批后，系统根据频率自动计算下一个周期的截止日期和起始日期（ONCE 不滚动）。
+
+### 8.5 前端路由
+- `/dashboard`：报送监控看板页面，所有已登录角色均可访问。
+- 看板卡片支持 Maker 快速跳转执行/提交，Checker 快速跳转审批。
+
+## 9. 已知风险与改进方向
 1. **SQL 注入与越权**：`ReportService.runReport` 与 `generateReport` 将用户参数直接拼接 SQL，应改为参数化查询并增加白名单。@backend/src/main/java/com/legacy/report/service/ReportService.java#26-65
 2. **DAO 责任过重**：`ReportDao` 混杂业务逻辑且缺乏更新/删除接口，需要 Repository 化 & 补齐审计。@backend/src/main/java/com/legacy/report/dao/ReportDao.java#17-56
 3. **前端安全性**：本地存储 Token 未加密，需配合刷新机制与过期处理。@frontend/src/app/services/auth.service.ts#24-65
 4. **审批人体验**：当前 Checker 只能看到结果快照缺少明细下载入口，可在待办区增加“导出 run”按钮复用现有 API。@frontend/src/app/components/report/report-viewer.component.html#174-235
 5. **多租户/隔离**：所有用户共享报表列表与数据源，未来需在 `Report` 实体和 SQL 层引入租户或标签。
 
-## 9. 后续工作建议
+## 10. 后续工作建议
 1. **安全重构**：引入参数模板、限制可执行 SQL、在服务层做输入验证与字段白名单。
 2. **审批队列优化**：增加分页/搜索、实时通知（WebSocket）和 SLA 计时展示，利用已有 Prometheus 指标扩展运营看板。@backend/src/main/java/com/legacy/report/service/ReportRunService.java#48-223
 3. **模板管理**：补齐报表 CRUD，加入草稿、发布、版本号等字段，Maker 只能使用已发布模板。
 4. **流程自动化**：允许配置「必须 2 个不同 Checker」或“金额阈值自动提交”等规则，可在 `ReportRun` 增加字段描述策略。
+5. **报送监控增强**：实时 WebSocket 通知、邮件/短信提醒、Admin 报送计划 CRUD 管理界面.
