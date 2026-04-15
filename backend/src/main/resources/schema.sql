@@ -110,3 +110,16 @@ CREATE TABLE report_config (
     is_deleted INT DEFAULT 0,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Report schedule table (deadline monitoring)
+CREATE TABLE report_schedule (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    report_id BIGINT NOT NULL UNIQUE,
+    frequency VARCHAR(16) NOT NULL,
+    current_deadline DATE NOT NULL,
+    period_start DATE NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP,
+    FOREIGN KEY (report_id) REFERENCES report_config(id)
+);

@@ -1,0 +1,217 @@
+.dashboard-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.dashboard-header h1 {
+  margin: 0;
+  font-size: 24px;
+  color: #333;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.user-info {
+  margin-right: 8px;
+  color: #666;
+  font-size: 14px;
+}
+
+.btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: opacity 0.2s;
+}
+
+.btn:hover { opacity: 0.85; }
+
+.btn-primary {
+  background: #4CAF50;
+  color: white;
+}
+
+.btn-secondary {
+  background: #757575;
+  color: white;
+}
+
+.btn-action {
+  background: #1976D2;
+  color: white;
+  width: 100%;
+}
+
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+  font-size: 16px;
+}
+
+.error {
+  color: #D32F2F;
+  background: #FFEBEE;
+  padding: 12px 16px;
+  border-radius: 4px;
+  margin-bottom: 16px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #999;
+  font-size: 16px;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.card {
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  transition: box-shadow 0.2s;
+}
+
+.card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.card.urgency-overdue {
+  border-color: #D32F2F;
+}
+
+.card.urgency-approaching {
+  border-color: #F57C00;
+}
+
+.card.urgency-completed {
+  border-color: #388E3C;
+}
+
+.card.urgency-normal {
+  border-color: #e0e0e0;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #FAFAFA;
+  border-bottom: 1px solid #eee;
+}
+
+.urgency-badge {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+}
+
+.urgency-badge.urgency-overdue {
+  background: #D32F2F;
+}
+
+.urgency-badge.urgency-approaching {
+  background: #F57C00;
+}
+
+.urgency-badge.urgency-completed {
+  background: #388E3C;
+}
+
+.urgency-badge.urgency-normal {
+  background: #9E9E9E;
+}
+
+.frequency-badge {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  background: #E3F2FD;
+  color: #1565C0;
+}
+
+.card-body {
+  padding: 16px;
+}
+
+.report-name {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  color: #333;
+}
+
+.report-desc {
+  margin: 0 0 16px 0;
+  font-size: 13px;
+  color: #777;
+  line-height: 1.4;
+}
+
+.card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.meta-label {
+  font-size: 13px;
+  color: #999;
+}
+
+.meta-value {
+  font-size: 13px;
+  color: #333;
+  font-weight: 500;
+}
+
+.days-remaining.urgency-overdue {
+  color: #D32F2F;
+  font-weight: 700;
+}
+
+.days-remaining.urgency-approaching {
+  color: #F57C00;
+  font-weight: 700;
+}
+
+.days-remaining.urgency-completed {
+  color: #388E3C;
+}
+
+.card-footer {
+  padding: 12px 16px;
+  border-top: 1px solid #eee;
+}

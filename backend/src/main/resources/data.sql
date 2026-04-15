@@ -147,3 +147,15 @@ INSERT INTO report_config (name, sql, description) VALUES
 -- Legacy report (marked as deleted)
 INSERT INTO report_config (name, sql, description, is_deleted) VALUES 
 ('Legacy Customer Overview', 'SELECT * FROM customer', '旧版客户概览 - 基础客户列表，已被综合报告取代', 1);
+
+-- Report schedule seed data (deadline monitoring dashboard)
+-- Use CURRENT_DATE-based offsets so the demo always has relevant data
+INSERT INTO report_schedule (report_id, frequency, current_deadline, period_start, enabled) VALUES
+(1, 'MONTHLY', DATEADD('DAY', 3, CURRENT_DATE), DATEADD('DAY', -27, CURRENT_DATE), TRUE),
+(2, 'QUARTERLY', DATEADD('DAY', 15, CURRENT_DATE), DATEADD('DAY', -75, CURRENT_DATE), TRUE),
+(3, 'WEEKLY', DATEADD('DAY', 1, CURRENT_DATE), DATEADD('DAY', -6, CURRENT_DATE), TRUE),
+(4, 'MONTHLY', DATEADD('DAY', -2, CURRENT_DATE), DATEADD('DAY', -32, CURRENT_DATE), TRUE),
+(5, 'MONTHLY', DATEADD('DAY', 5, CURRENT_DATE), DATEADD('DAY', -25, CURRENT_DATE), TRUE),
+(6, 'QUARTERLY', DATEADD('DAY', 30, CURRENT_DATE), DATEADD('DAY', -60, CURRENT_DATE), TRUE),
+(7, 'MONTHLY', DATEADD('DAY', 0, CURRENT_DATE), DATEADD('DAY', -30, CURRENT_DATE), TRUE),
+(8, 'WEEKLY', DATEADD('DAY', 6, CURRENT_DATE), DATEADD('DAY', -1, CURRENT_DATE), TRUE);

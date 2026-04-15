@@ -45,6 +45,9 @@ public class ReportRunService {
     @Autowired
     private ReportAuditEventRepository reportAuditEventRepository;
 
+    @Autowired
+    private ReportScheduleService reportScheduleService;
+
     private Counter generatedCounter;
     private Counter submittedCounter;
     private Counter approvedCounter;
@@ -204,6 +207,7 @@ public class ReportRunService {
             if (approvedCounter != null) {
                 approvedCounter.increment();
             }
+            reportScheduleService.rollForwardIfNeeded(saved.getReportId());
         } else {
             if (rejectedCounter != null) {
                 rejectedCounter.increment();
