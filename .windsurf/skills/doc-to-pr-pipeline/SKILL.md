@@ -98,6 +98,8 @@ git commit -m "<message>"
 - After finishing a review pass, the viewer notifies the executor to resume work based on the comments.
 - Executor addresses feedback, re-runs tests, then squashes the updated commits before pushing to the same remote branch.
 - Viewer repeats the review process until no unresolved comments remain and test coverage is ≥ 70%.
+- Checklist completion is mandatory: do not close the workflow or switch phases until every required checkbox in `checklist/<spec>.md` is marked `[x]`. If any remain unchecked, continue implementing/tests/docs/push steps until the list is fully completed.
+- When the reviewer agrees the PR is ready, they must leave a final “no-questions” comment (e.g., `gh pr review --comment --body "LGTM"`) to document approval before exiting the workflow.
 
 ### Phase 5: Quality Gates
 
