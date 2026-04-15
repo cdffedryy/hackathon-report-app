@@ -3,8 +3,8 @@
 - [x] Requirements generated via /speckit.specify
 - [x] Quality checklist generated via /speckit.checklist
 - [x] Technical plan generated via /speckit.plan
-- [ ] Code implemented per spec
-- [ ] Tests updated/passing locally
+- [x] Code implemented per spec
+- [x] Tests updated/passing locally
 - [ ] Feature branch pushed & PR updated
 - [ ] /review workflow run with inline comments
 - [ ] Review comments resolved & tests rerun
