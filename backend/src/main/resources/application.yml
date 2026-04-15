@@ -45,6 +45,7 @@ report:
       - report_config
       - report_run
       - report_audit_event
+      - report_schedule
     forbidden-tokens:
       - ";"
       - "--"

@@ -5,7 +5,9 @@
   <div class="section auth-section">
     <h2>登录</h2>
     <div *ngIf="authService.isLoggedIn(); else loginForm">
-      <p>当前用户：{{ authService.getCurrentUser()?.username }}</p>
+      <p>当前用户：{{ authService.getCurrentUser()?.username }}
+        <a href="/dashboard" style="margin-left: 16px; color: #1976D2; text-decoration: underline; cursor: pointer;">报送监控看板</a>
+      </p>
       <button (click)="logout()">退出登录</button>
     </div>
     <ng-template #loginForm>
